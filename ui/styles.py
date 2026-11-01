@@ -1,5 +1,7 @@
 """Shared visual tokens and reusable styles for the SMED Studio interface."""
 
+import re
+
 COLORS = {
     "bg_darkest": "#E9EEF4",
     "bg_main": "#F3F6FA",
@@ -538,16 +540,21 @@ QToolTip {
 }
 """
 
-MODERN_LIGHT_INDUSTRIAL_QSS = _LIGHT_INDUSTRIAL_QSS
-MODERN_DARK_INDUSTRIAL_QSS = MODERN_LIGHT_INDUSTRIAL_QSS
+def _resolve_style_tokens(stylesheet: str) -> str:
+    """Replace complete design-token names without matching token prefixes."""
+    token_pattern = re.compile(r"@([A-Za-z_][A-Za-z0-9_]*)")
 
-for _token_name, _token_value in _STYLE_TOKENS.items():
-    MODERN_LIGHT_INDUSTRIAL_QSS = MODERN_LIGHT_INDUSTRIAL_QSS.replace(
-        f"@{_token_name}", _token_value
-    )
-    MODERN_DARK_INDUSTRIAL_QSS = MODERN_DARK_INDUSTRIAL_QSS.replace(
-        f"@{_token_name}", _token_value
-    )
+    def replace_token(match: re.Match[str]) -> str:
+        token_name = match.group(1)
+        if token_name not in _STYLE_TOKENS:
+            raise ValueError(f"Unknown stylesheet design token: @{token_name}")
+        return _STYLE_TOKENS[token_name]
+
+    return token_pattern.sub(replace_token, stylesheet)
+
+
+MODERN_LIGHT_INDUSTRIAL_QSS = _resolve_style_tokens(_LIGHT_INDUSTRIAL_QSS)
+MODERN_DARK_INDUSTRIAL_QSS = MODERN_LIGHT_INDUSTRIAL_QSS
 
 
 def get_internal_badge_style() -> str:
