@@ -1,6 +1,7 @@
 """Shared visual tokens and reusable styles for the SMED Studio interface."""
 
 import re
+from pathlib import Path
 
 COLORS = {
     "bg_darkest": "#E9EEF4",
@@ -63,6 +64,8 @@ RADII = {
 
 _STYLE_TOKENS = {
     **COLORS,
+    "spin_up_icon": (Path(__file__).parent / "assets" / "spin-up.svg").resolve().as_posix(),
+    "spin_down_icon": (Path(__file__).parent / "assets" / "spin-down.svg").resolve().as_posix(),
     **{f"font_{name}": value for name, value in TYPOGRAPHY.items()},
     **{f"space_{name}": f"{value}px" for name, value in SPACING.items()},
     **{f"radius_{name}": f"{value}px" for name, value in RADII.items()},
@@ -81,10 +84,56 @@ QMainWindow, QDialog {
     background-color: @bg_main;
 }
 
+QWidget#appHeader {
+    background-color: @bg_card;
+    border: 1px solid @border;
+    border-radius: @radius_card;
+}
+
+QLabel#appTitle {
+    color: @deep_navy;
+    font-size: 22px;
+    font-weight: 700;
+}
+
+QLabel#appSubtitle {
+    color: @text_secondary;
+    font-size: @font_caption;
+}
+
+QWidget#projectIdentity {
+    background-color: #F5F8FB;
+    border: 1px solid @border;
+    border-radius: @radius_control;
+}
+
+QLabel#projectLabel {
+    color: @text_secondary;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+QLabel#activeProjectName {
+    color: @deep_navy;
+    font-size: @font_body;
+    font-weight: 700;
+}
+
+QLabel#offlineStatus {
+    color: @external_emerald;
+    background-color: @external_bg;
+    border: 1px solid #C9E4D4;
+    border-radius: @radius_control;
+    padding: 8px 12px;
+    font-size: @font_caption;
+    font-weight: 700;
+}
+
 QMenuBar {
-    background-color: @deep_navy;
-    color: #FFFFFF;
-    padding: 4px 8px;
+    background-color: @bg_card;
+    color: @deep_navy;
+    border-bottom: 1px solid @border;
+    padding: 3px 8px;
 }
 
 QMenuBar::item {
@@ -94,7 +143,8 @@ QMenuBar::item {
 }
 
 QMenuBar::item:selected, QMenuBar::item:pressed {
-    background-color: @navy_hover;
+    color: @deep_navy;
+    background-color: @selection_bg;
 }
 
 QMenu {
@@ -123,6 +173,7 @@ QMenu::separator {
 QTabWidget::pane {
     background-color: @bg_main;
     border: 1px solid @border;
+    border-top: none;
     border-radius: @radius_card;
     top: -1px;
 }
@@ -156,6 +207,27 @@ QTabBar::tab:focus {
     border: 2px solid @focus_ring;
 }
 
+QTabBar#workflowTabBar::tab {
+    width: 210px;
+    padding: 10px 18px;
+    margin-right: 5px;
+}
+
+QTabBar#workflowTabBar::tab:selected {
+    color: @deep_navy;
+    background-color: @bg_card;
+    border: 1px solid @border;
+    border-bottom: 3px solid @primary_blue;
+    font-weight: 700;
+}
+
+QTabBar#workflowTabBar::tab:selected:focus {
+    border-top: 1px solid @focus_ring;
+    border-left: 1px solid @focus_ring;
+    border-right: 1px solid @focus_ring;
+    border-bottom: 3px solid @primary_blue;
+}
+
 QGroupBox {
     background-color: @bg_card;
     border: 1px solid @border;
@@ -174,6 +246,323 @@ QGroupBox::title {
     color: @deep_navy;
     background-color: @bg_card;
     font-size: @font_section_heading;
+    font-weight: 700;
+}
+
+QWidget#paretoPageContent {
+    background-color: @bg_main;
+}
+
+QScrollArea#paretoPageScrollArea {
+    background-color: @bg_main;
+    border: none;
+}
+
+QFrame#paretoToolbar, QFrame#paretoKpiContainer {
+    background-color: @bg_card;
+    border: 1px solid @border;
+    border-radius: @radius_card;
+}
+
+QLabel#paretoToolbarLabel {
+    color: @deep_navy;
+}
+
+QLabel#paretoProjectName {
+    color: @primary_blue_pressed;
+    font-weight: 700;
+}
+
+QWidget#dashboardPageContent {
+    background-color: @bg_main;
+}
+
+QScrollArea#dashboardPageScrollArea {
+    background-color: @bg_main;
+    border: none;
+}
+
+QFrame#dashboardToolbar, QFrame#dashboardKpiCard {
+    background-color: @bg_card;
+    border: 1px solid @border;
+    border-radius: @radius_card;
+}
+
+QLabel#dashboardToolbarLabel {
+    color: @text_secondary;
+    font-size: @font_caption;
+    font-weight: 700;
+}
+
+QLabel#dashboardProjectTitle {
+    color: @deep_navy;
+    font-size: @font_body;
+    font-weight: 700;
+}
+
+QLabel#dashboardKpiTitle {
+    color: @text_secondary;
+    font-size: @font_caption;
+    font-weight: 700;
+}
+
+QLabel#dashboardKpiValue {
+    color: @deep_navy;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+QLabel#dashboardKpiValue[kind="internal"] {
+    color: @internal_red;
+}
+
+QLabel#dashboardKpiValue[kind="external"] {
+    color: @external_emerald;
+}
+
+QLabel#dashboardKpiValue[kind="spotlight"] {
+    color: @primary_blue_pressed;
+}
+
+QLabel#dashboardKpiSubtext {
+    color: @text_secondary;
+    font-size: @font_caption;
+}
+
+QLabel#dashboardStatusBadge {
+    border: 1px solid @border;
+    border-radius: @radius_small;
+    padding: 5px 7px;
+    font-size: @font_caption;
+    font-weight: 700;
+}
+
+QLabel#dashboardStatusBadge[status="pending"],
+QLabel#dashboardKpiSubtext[status="pending"] {
+    color: @text_secondary;
+}
+
+QLabel#dashboardStatusBadge[status="pending"] {
+    background-color: @bg_card_elevated;
+}
+
+QLabel#dashboardStatusBadge[status="success"] {
+    color: @external_emerald;
+    background-color: @external_bg;
+    border-color: #C9E4D4;
+    font-weight: 700;
+}
+
+QLabel#dashboardKpiSubtext[status="success"] {
+    color: @external_emerald;
+    font-weight: 700;
+}
+
+QLabel#dashboardStatusBadge[status="warning"] {
+    color: @warning_amber;
+    background-color: #FFF4D6;
+    border-color: #E8C46A;
+    font-weight: 700;
+}
+
+QLabel#dashboardKpiSubtext[status="warning"] {
+    color: @warning_amber;
+    font-weight: 700;
+}
+
+QLabel#dashboardPlanStatus {
+    border-radius: @radius_small;
+    padding: 4px 6px;
+    font-size: @font_caption;
+    font-weight: 700;
+}
+
+QLabel#dashboardPlanStatus[status="success"] {
+    color: @external_emerald;
+    background-color: @external_bg;
+}
+
+QLabel#dashboardPlanStatus[status="onTarget"] {
+    color: @primary_blue_pressed;
+    background-color: @selection_bg;
+}
+
+QLabel#dashboardPlanStatus[status="warning"] {
+    color: @warning_amber;
+    background-color: #FFF4D6;
+}
+
+QLabel#paretoKpiTitle {
+    color: @text_secondary;
+    font-size: @font_caption;
+    font-weight: 700;
+}
+
+QLabel#paretoKpiBaseline, QLabel#paretoKpiTarget,
+QLabel#paretoKpiSavings, QLabel#paretoKpiProjected {
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 17px;
+    font-weight: 700;
+}
+
+QLabel#paretoKpiBaseline {
+    color: @deep_navy;
+}
+
+QLabel#paretoKpiTarget {
+    color: @primary_blue_pressed;
+}
+
+QLabel#paretoKpiSavings {
+    color: @external_emerald;
+}
+
+QLabel#paretoKpiProjected {
+    color: @warning_amber;
+}
+
+QLabel#paretoKpiSubtext {
+    color: @text_secondary;
+    font-size: @font_caption;
+}
+
+QLabel#paretoKpiStatus {
+    border: 1px solid @border;
+    border-radius: @radius_small;
+    padding: 3px 8px;
+    font-size: @font_caption;
+    font-weight: 700;
+}
+
+QLabel#paretoKpiStatus[status="pending"] {
+    color: @text_secondary;
+    background-color: @bg_card_elevated;
+}
+
+QLabel#paretoKpiStatus[status="achieved"] {
+    color: @primary_blue_pressed;
+    background-color: @selection_bg;
+    border-color: #B8D1F2;
+}
+
+QLabel#paretoKpiStatus[status="success"] {
+    color: @external_emerald;
+    background-color: @external_bg;
+    border-color: #C9E4D4;
+}
+
+QLabel#paretoKpiStatus[status="warning"] {
+    color: @warning_amber;
+    background-color: #FFF4D6;
+    border-color: #E8C46A;
+}
+
+QLabel#paretoVitalFewRank {
+    color: @warning_amber;
+    background-color: #FFF4D6;
+    border: 1px solid #E8C46A;
+    border-radius: @radius_small;
+    padding: 4px;
+    font-weight: 700;
+}
+
+QLabel#paretoRank {
+    color: @text_secondary;
+    padding: 4px;
+    font-weight: 600;
+}
+
+QPlainTextEdit#kaizenTextEditor {
+    color: @text_primary;
+    background-color: @bg_input;
+    border: 1px solid @border;
+    border-radius: @radius_control;
+    padding: 5px 7px;
+    font-size: @font_caption;
+}
+
+QPlainTextEdit#kaizenTextEditor:focus {
+    border: 2px solid @focus_ring;
+}
+
+QComboBox#kaizenStageSelector, QComboBox#kaizenTargetSelector {
+    min-height: 34px;
+    padding: 5px 8px;
+}
+
+QFrame#videoToolbar {
+    background-color: @bg_card;
+    border: 1px solid @border;
+    border-radius: @radius_card;
+}
+
+QLabel#videoToolbarLabel {
+    color: @deep_navy;
+}
+
+QLabel#videoGuidance {
+    color: @text_secondary;
+    font-size: @font_caption;
+}
+
+QLabel#videoActiveProject {
+    color: @primary_blue_pressed;
+    font-size: @font_body;
+    font-weight: 700;
+}
+
+QLabel#videoTimeline {
+    color: @primary_blue_pressed;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+QLabel#videoInfo, QLabel#lapStatus, QLabel#subtotalCount {
+    color: @text_secondary;
+    font-size: @font_caption;
+}
+
+QLabel#stopwatchCaption {
+    color: @deep_navy;
+}
+
+QRadioButton#internalRadio {
+    color: @internal_red;
+    background-color: @internal_bg;
+    border: 1px solid #E8CACA;
+    border-radius: @radius_small;
+    padding: 4px 8px;
+    font-weight: 700;
+}
+
+QRadioButton#externalRadio {
+    color: @external_emerald;
+    background-color: @external_bg;
+    border: 1px solid #C9E4D4;
+    border-radius: @radius_small;
+    padding: 4px 8px;
+    font-weight: 700;
+}
+
+QFrame#videoSubtotalBar {
+    background-color: @bg_card_elevated;
+    border: 1px solid @border;
+    border-radius: @radius_control;
+}
+
+QLabel#subtotalInternal {
+    color: @internal_red;
+    font-weight: 700;
+}
+
+QLabel#subtotalExternal {
+    color: @external_emerald;
+    font-weight: 700;
+}
+
+QLabel#subtotalTotal {
+    color: @primary_blue_pressed;
     font-weight: 700;
 }
 
@@ -229,6 +618,78 @@ QLabel#warningBadge {
     font-weight: 700;
 }
 
+QLabel#projectSectionTitle {
+    color: @deep_navy;
+    font-size: @font_section_heading;
+    font-weight: 700;
+}
+
+QLabel#projectSectionDescription {
+    color: @text_secondary;
+    font-size: @font_caption;
+}
+
+QLabel#projectFieldLabel, QLabel#projectSummaryLabel {
+    color: @text_secondary;
+    font-size: @font_caption;
+    font-weight: 600;
+}
+
+QLabel#projectName {
+    color: @deep_navy;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+QLabel#projectStatusBadge {
+    color: @primary_blue_pressed;
+    background-color: @selection_bg;
+    border: 1px solid #B8D1F2;
+    border-radius: @radius_small;
+    padding: 3px 8px;
+    font-size: @font_caption;
+    font-weight: 700;
+}
+
+QLabel#projectSummaryValue {
+    color: @text_primary;
+    font-size: @font_caption;
+}
+
+QFrame#projectMetric {
+    background-color: @bg_card_elevated;
+    border: 1px solid @border;
+    border-radius: @radius_small;
+}
+
+QLabel#projectMetricLabel {
+    color: @text_secondary;
+    font-size: @font_caption;
+    font-weight: 600;
+}
+
+QLabel#projectMetricValue {
+    color: @deep_navy;
+    font-size: @font_section_heading;
+    font-weight: 700;
+}
+
+QLabel#projectEmptyState {
+    color: @text_secondary;
+    background-color: @bg_card;
+    border: 1px dashed @border;
+    border-radius: @radius_control;
+    padding: 20px;
+    font-size: @font_body;
+}
+
+QFrame#projectSeparator {
+    background-color: @border;
+    border: none;
+    max-height: 1px;
+    min-height: 1px;
+}
+
 QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox, QComboBox {
     color: @text_primary;
     background-color: @bg_input;
@@ -261,6 +722,52 @@ QSpinBox:disabled, QDoubleSpinBox:disabled, QComboBox:disabled {
     color: @text_muted;
     background-color: #EDF1F5;
     border-color: @border;
+}
+
+QSpinBox::up-button, QDoubleSpinBox::up-button,
+QSpinBox::down-button, QDoubleSpinBox::down-button {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 24px;
+    background-color: @bg_card_elevated;
+    border-left: 1px solid @border;
+}
+
+QSpinBox::up-button, QDoubleSpinBox::up-button {
+    height: 18px;
+    border-top-right-radius: @radius_small;
+    border-bottom: 1px solid @border;
+}
+
+QSpinBox::down-button, QDoubleSpinBox::down-button {
+    subcontrol-position: bottom right;
+    height: 18px;
+    border-bottom-right-radius: @radius_small;
+}
+
+QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
+    background-color: @selection_bg;
+}
+
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+    width: 12px;
+    height: 8px;
+    image: url("@spin_up_icon");
+}
+
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+    width: 12px;
+    height: 8px;
+    image: url("@spin_down_icon");
+}
+
+QSpinBox:disabled::up-arrow, QDoubleSpinBox:disabled::up-arrow {
+    opacity: 0.55;
+}
+
+QSpinBox:disabled::down-arrow, QDoubleSpinBox:disabled::down-arrow {
+    opacity: 0.55;
 }
 
 QComboBox::drop-down {
@@ -442,6 +949,16 @@ QTreeWidget::item:selected, QTreeView::item:selected {
     color: @deep_navy;
 }
 
+QTableWidget#projectRepositoryTable::item:hover:!selected {
+    background-color: #EDF4FB;
+    color: @text_primary;
+}
+
+QTableWidget#projectRepositoryTable::item:selected {
+    background-color: @selection_bg;
+    color: @deep_navy;
+}
+
 QTableWidget:focus, QTableView:focus, QTreeWidget:focus, QTreeView:focus {
     border: 2px solid @focus_ring;
 }
@@ -523,10 +1040,10 @@ QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
 }
 
 QStatusBar {
-    color: #FFFFFF;
-    background-color: @deep_navy;
-    border-top: 1px solid #294660;
-    padding: 5px 12px;
+    color: @text_secondary;
+    background-color: @bg_card;
+    border-top: 1px solid @border;
+    padding: 6px 12px;
     font-size: @font_caption;
 }
 

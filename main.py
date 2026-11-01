@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
 
 from database.db_manager import DatabaseManager, get_db
 from database.seed_data import seed_sample_project
-from ui.styles import MODERN_DARK_INDUSTRIAL_QSS, COLORS
+from ui.styles import MODERN_LIGHT_INDUSTRIAL_QSS
 from ui.project_tab import ProjectTab
 from ui.video_logger_tab import VideoLoggerTab
 from ui.pareto_kaizen_tab import ParetoKaizenTab
@@ -52,66 +52,86 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
 
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(12, 10, 12, 10)
-        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(16, 12, 16, 12)
+        main_layout.setSpacing(12)
 
-        # Top Header Branding Bar
+        # Application identity and active-project context
         header = QWidget()
-        header.setStyleSheet("background-color: #0B0F17; border-radius: 8px; padding: 6px 14px;")
+        header.setObjectName("appHeader")
+        header.setAccessibleName("SMED Studio application header")
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(8, 6, 8, 6)
+        header_layout.setContentsMargins(16, 12, 16, 12)
+        header_layout.setSpacing(20)
 
         title_layout = QVBoxLayout()
-        title_layout.setSpacing(2)
-        app_title = QLabel("⚙ SMED STUDIO  <span style='color:#0EA5E9; font-weight:400;'>| Industrial Kaizen Video Analyzer</span>")
-        app_title.setStyleSheet("font-size: 17px; font-weight: 800; color: #F8FAFC;")
+        title_layout.setSpacing(3)
+        app_title = QLabel("SMED Studio")
+        app_title.setObjectName("appTitle")
         title_layout.addWidget(app_title)
 
-        tagline = QLabel("Shigeo Shingo SMED Methodology • Baseline Multi-Video Dual-Stopwatch Observation • Target ≥ 50% Setup Reduction")
-        tagline.setStyleSheet("font-size: 11px; color: #64748B; font-weight: 500;")
-        title_layout.addWidget(tagline)
+        app_subtitle = QLabel("Industrial changeover analysis")
+        app_subtitle.setObjectName("appSubtitle")
+        title_layout.addWidget(app_subtitle)
         header_layout.addLayout(title_layout)
 
         header_layout.addStretch()
 
-        # Offline & Target Badges
-        offline_badge = QLabel("● 100% OFFLINE LOCAL")
-        offline_badge.setStyleSheet(
-            "background-color: rgba(16, 185, 129, 0.15); color: #34D399; font-size: 11px; "
-            "font-weight: 700; border: 1px solid #059669; border-radius: 4px; padding: 4px 8px;"
-        )
-        header_layout.addWidget(offline_badge)
+        project_identity = QWidget()
+        project_identity.setObjectName("projectIdentity")
+        project_identity_layout = QVBoxLayout(project_identity)
+        project_identity_layout.setContentsMargins(12, 7, 12, 7)
+        project_identity_layout.setSpacing(2)
 
-        target_badge = QLabel("TARGET: < 10 MIN (SMED)")
-        target_badge.setStyleSheet(
-            "background-color: rgba(14, 165, 233, 0.15); color: #38BDF8; font-size: 11px; "
-            "font-weight: 700; border: 1px solid #0284C7; border-radius: 4px; padding: 4px 8px;"
-        )
-        header_layout.addWidget(target_badge)
+        project_label = QLabel("ACTIVE PROJECT")
+        project_label.setObjectName("projectLabel")
+        project_identity_layout.addWidget(project_label)
+
+        self.lbl_active_project = QLabel("No project selected")
+        self.lbl_active_project.setObjectName("activeProjectName")
+        self.lbl_active_project.setMinimumWidth(0)
+        self.lbl_active_project.setToolTip("No project selected")
+        project_identity_layout.addWidget(self.lbl_active_project)
+        header_layout.addWidget(project_identity)
+
+        offline_status = QLabel("●  Local / Offline")
+        offline_status.setObjectName("offlineStatus")
+        offline_status.setAccessibleName("Application data remains local and offline")
+        header_layout.addWidget(offline_status)
 
         main_layout.addWidget(header)
 
         # Tab Navigation Widget
         self.tabs = QTabWidget()
+        self.tabs.setObjectName("workflowTabs")
         self.tabs.setDocumentMode(True)
+        self.tabs.tabBar().setObjectName("workflowTabBar")
+        self.tabs.tabBar().setDrawBase(False)
 
         # Tab 1: Project Setup
         self.tab_projects = ProjectTab(db=self.db)
-        self.tabs.addTab(self.tab_projects, "  1. Projects & Repository  ")
+        self.tabs.addTab(self.tab_projects, "Projects")
+        self.tabs.setTabToolTip(0, "Projects & Repository")
+        self.tab_projects.setAccessibleName("Projects and Repository")
 
         # Tab 2: Multi-Video Dual-Stopwatch Logger
         self.tab_logger = VideoLoggerTab(db=self.db)
-        self.tabs.addTab(self.tab_logger, "  2. Multi-Video Dual-Stopwatch Logger  ")
+        self.tabs.addTab(self.tab_logger, "Video Logger")
+        self.tabs.setTabToolTip(1, "Multi-Video Dual-Stopwatch Logger")
+        self.tab_logger.setAccessibleName("Multi-Video Dual-Stopwatch Logger")
 
         # Tab 3: Pareto & Kaizen Matrix
         self.tab_pareto = ParetoKaizenTab(db=self.db)
-        self.tabs.addTab(self.tab_pareto, "  3. Pareto & Kaizen Matrix  ")
+        self.tabs.addTab(self.tab_pareto, "Pareto & Kaizen")
+        self.tabs.setTabToolTip(2, "Pareto & Kaizen Matrix")
+        self.tab_pareto.setAccessibleName("Pareto Analysis and Kaizen Matrix")
 
         # Tab 4: Before vs After Dashboard & Report
         self.tab_dashboard = DashboardTab(db=self.db)
-        self.tabs.addTab(self.tab_dashboard, "  4. Before vs. After Dashboard & Report  ")
+        self.tabs.addTab(self.tab_dashboard, "Dashboard")
+        self.tabs.setTabToolTip(3, "Before vs. After Dashboard & Report")
+        self.tab_dashboard.setAccessibleName("Before and After Dashboard and Reports")
 
-        main_layout.addWidget(self.tabs)
+        main_layout.addWidget(self.tabs, stretch=1)
 
         # Wire Signals across all 4 Tabs
         self.tab_projects.project_selected.connect(self._on_project_activated)
@@ -135,6 +155,8 @@ class MainWindow(QMainWindow):
 
         # Status Bar
         self.status = QStatusBar()
+        self.status.setObjectName("applicationStatusBar")
+        self.status.setSizeGripEnabled(True)
         self.setStatusBar(self.status)
         self.status.showMessage("SMED Studio Ready. Database: smed_local.db connected.")
 
@@ -199,6 +221,9 @@ class MainWindow(QMainWindow):
             self.tab_logger.set_project(first_id)
             self.tab_pareto.set_project(first_id)
             self.tab_dashboard.set_project(first_id)
+            self._update_active_project_identity(first_id)
+        else:
+            self._update_active_project_identity(None)
 
     def _on_tab_changed(self, index: int):
         """When switching to Tab 3 (Pareto) or Tab 4 (Dashboard), refresh data automatically."""
@@ -215,7 +240,19 @@ class MainWindow(QMainWindow):
         self.tabs.setCurrentIndex(1)  # Switch to Video Logger
         project = self.db.get_project(project_id)
         name = project["name"] if project else f"Project #{project_id}"
+        self._update_active_project_identity(project_id, name)
         self.status.showMessage(f"Active Project set to: {name}", 5000)
+
+    def _update_active_project_identity(self, project_id: int = None, name: str = None):
+        """Update the persistent header identity for the currently active project."""
+        if project_id is None:
+            project_name = "No project selected"
+        else:
+            project = self.db.get_project(project_id)
+            project_name = name or (project["name"] if project else f"Project #{project_id}")
+
+        self.lbl_active_project.setText(project_name)
+        self.lbl_active_project.setToolTip(project_name)
 
     def _get_active_project_id(self) -> int:
         """Helper to get current active project ID from logger or projects tab."""
@@ -547,7 +584,7 @@ class MainWindow(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-    app.setStyleSheet(MODERN_DARK_INDUSTRIAL_QSS)
+    app.setStyleSheet(MODERN_LIGHT_INDUSTRIAL_QSS)
 
     window = MainWindow()
     window.show()
