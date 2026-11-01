@@ -19,8 +19,8 @@ from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
-    QSplitter, QGroupBox, QFrame, QFileDialog, QMessageBox,
-    QAbstractItemView
+    QGroupBox, QFrame, QFileDialog, QMessageBox, QAbstractItemView,
+    QScrollArea, QSizePolicy
 )
 
 from database.db_manager import DatabaseManager, get_db
@@ -44,11 +44,28 @@ class DashboardTab(QWidget):
         self.db = db or get_db()
         self.active_project_id: Optional[int] = None
         self.report_data: Optional[Dict[str, Any]] = None
+        self._dashboard_kpi_cards: List[QFrame] = []
+        self._kpi_grid: Optional[QGridLayout] = None
+        self._kpi_columns = 0
 
         self._init_ui()
 
     def _init_ui(self):
-        root_layout = QVBoxLayout(self)
+        page_layout = QVBoxLayout(self)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll_area = QScrollArea(self)
+        scroll_area.setObjectName("dashboardPageScrollArea")
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        page_layout.addWidget(scroll_area)
+
+        page_content = QWidget()
+        page_content.setObjectName("dashboardPageContent")
+        scroll_area.setWidget(page_content)
+
+        root_layout = QVBoxLayout(page_content)
         root_layout.setContentsMargins(12, 12, 12, 12)
         root_layout.setSpacing(10)
 
@@ -56,30 +73,35 @@ class DashboardTab(QWidget):
         # TOP TOOLBAR: Active Project Title & Export Action Buttons
         # =====================================================================
         top_bar = QFrame()
-        top_bar.setStyleSheet("background-color: #1E293B; border-radius: 6px; padding: 6px;")
+        top_bar.setObjectName("dashboardToolbar")
         top_layout = QHBoxLayout(top_bar)
-        top_layout.setContentsMargins(8, 4, 8, 4)
-        top_layout.setSpacing(12)
+        top_layout.setContentsMargins(12, 8, 12, 8)
+        top_layout.setSpacing(8)
 
-        top_layout.addWidget(QLabel("<b>Active Project:</b>"))
+        project_label = QLabel("ACTIVE PROJECT")
+        project_label.setObjectName("dashboardToolbarLabel")
+        top_layout.addWidget(project_label)
         self.lbl_project_title = QLabel("No Project Selected")
-        self.lbl_project_title.setStyleSheet("color: #38BDF8; font-weight: 700; font-size: 14px;")
-        top_layout.addWidget(self.lbl_project_title)
+        self.lbl_project_title.setObjectName("dashboardProjectTitle")
+        self.lbl_project_title.setWordWrap(True)
+        self.lbl_project_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        top_layout.addWidget(self.lbl_project_title, 1)
 
-        top_layout.addStretch()
-
-        self.btn_refresh = QPushButton(" Refresh Analytics")
+        self.btn_refresh = QPushButton("Refresh")
+        self.btn_refresh.setToolTip("Refresh the dashboard analytics for the active project.")
         self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_refresh.clicked.connect(self.refresh_analytics)
         top_layout.addWidget(self.btn_refresh)
 
-        self.btn_export_excel = QPushButton(" Export Full Excel Report (.xlsx)")
+        self.btn_export_excel = QPushButton("Export Excel")
+        self.btn_export_excel.setToolTip("Export the full Excel report (.xlsx).")
         self.btn_export_excel.setObjectName("primaryBtn")
         self.btn_export_excel.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_export_excel.clicked.connect(self._on_export_excel)
         top_layout.addWidget(self.btn_export_excel)
 
-        self.btn_export_pdf = QPushButton(" Export Executive PDF Report (.pdf)")
+        self.btn_export_pdf = QPushButton("Export PDF")
+        self.btn_export_pdf.setToolTip("Export the executive PDF report (.pdf).")
         self.btn_export_pdf.setObjectName("successBtn")
         self.btn_export_pdf.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_export_pdf.clicked.connect(self._on_export_pdf)
@@ -91,89 +113,105 @@ class DashboardTab(QWidget):
         # ROW 1: 5 EXECUTIVE KPI CARDS
         # =====================================================================
         kpi_container = QFrame()
-        kpi_container.setStyleSheet("background-color: #0F172A; border: 1px solid #1E293B; border-radius: 8px; padding: 6px;")
+        kpi_container.setObjectName("dashboardKpiContainer")
         kpi_grid = QGridLayout(kpi_container)
-        kpi_grid.setContentsMargins(10, 8, 10, 8)
-        kpi_grid.setHorizontalSpacing(14)
-        kpi_grid.setVerticalSpacing(4)
+        kpi_grid.setContentsMargins(0, 0, 0, 0)
+        kpi_grid.setHorizontalSpacing(8)
+        kpi_grid.setVerticalSpacing(8)
+        self._kpi_grid = kpi_grid
 
         # Card 1: Total SMED Setup Time
-        kpi_grid.addWidget(QLabel("<b>TOTAL SETUP TIME (BEFORE -> AFTER)</b>"), 0, 0)
+        card_total = self._create_kpi_card(kpi_grid, 0, "TOTAL SETUP TIME")
         self.val_kpi_total = QLabel("00m 00s -> 00m 00s")
-        self.val_kpi_total.setStyleSheet("color: #F8FAFC; font-size: 15px; font-weight: 800; font-family: monospace;")
-        kpi_grid.addWidget(self.val_kpi_total, 1, 0)
+        self.val_kpi_total.setObjectName("dashboardKpiValue")
+        self.val_kpi_total.setProperty("kind", "total")
+        self.val_kpi_total.setWordWrap(True)
+        card_total.addWidget(self.val_kpi_total)
         self.sub_kpi_total = QLabel("Saved: 00m 00s (0.0% reduction)")
-        self.sub_kpi_total.setStyleSheet("color: #10B981; font-weight: 700; font-size: 11px;")
-        kpi_grid.addWidget(self.sub_kpi_total, 2, 0)
+        self.sub_kpi_total.setObjectName("dashboardKpiSubtext")
+        self.sub_kpi_total.setWordWrap(True)
+        card_total.addWidget(self.sub_kpi_total)
 
         # Card 2: Internal Machine Downtime
-        kpi_grid.addWidget(QLabel("<b>MACHINE DOWNTIME (INTERNAL TIME)</b>"), 0, 1)
+        card_internal = self._create_kpi_card(kpi_grid, 1, "MACHINE DOWNTIME")
         self.val_kpi_internal = QLabel("00m 00s -> 00m 00s")
-        self.val_kpi_internal.setStyleSheet("color: #EF4444; font-size: 15px; font-weight: 800; font-family: monospace;")
-        kpi_grid.addWidget(self.val_kpi_internal, 1, 1)
+        self.val_kpi_internal.setObjectName("dashboardKpiValue")
+        self.val_kpi_internal.setProperty("kind", "internal")
+        self.val_kpi_internal.setWordWrap(True)
+        card_internal.addWidget(self.val_kpi_internal)
         self.sub_kpi_internal = QLabel("0.0% machine downtime reduced")
-        self.sub_kpi_internal.setStyleSheet("color: #94A3B8; font-size: 11px;")
-        kpi_grid.addWidget(self.sub_kpi_internal, 2, 1)
+        self.sub_kpi_internal.setObjectName("dashboardKpiSubtext")
+        self.sub_kpi_internal.setWordWrap(True)
+        card_internal.addWidget(self.sub_kpi_internal)
 
         # Card 3: External Activity Shift
-        kpi_grid.addWidget(QLabel("<b>EXTERNAL ACTIVITY SHIFT</b>"), 0, 2)
+        card_external = self._create_kpi_card(kpi_grid, 2, "EXTERNAL ACTIVITY SHIFT")
         self.val_kpi_external = QLabel("00m 00s -> 00m 00s")
-        self.val_kpi_external.setStyleSheet("color: #34D399; font-size: 15px; font-weight: 800; font-family: monospace;")
-        kpi_grid.addWidget(self.val_kpi_external, 1, 2)
+        self.val_kpi_external.setObjectName("dashboardKpiValue")
+        self.val_kpi_external.setProperty("kind", "external")
+        self.val_kpi_external.setWordWrap(True)
+        card_external.addWidget(self.val_kpi_external)
         self.sub_kpi_external = QLabel("0 activities shifted outside downtime")
-        self.sub_kpi_external.setStyleSheet("color: #94A3B8; font-size: 11px;")
-        kpi_grid.addWidget(self.sub_kpi_external, 2, 2)
+        self.sub_kpi_external.setObjectName("dashboardKpiSubtext")
+        self.sub_kpi_external.setWordWrap(True)
+        card_external.addWidget(self.sub_kpi_external)
 
         # Card 4: 50% Reduction & Single-Minute Badge
-        kpi_grid.addWidget(QLabel("<b>SMED GOAL & 6TH OK PART STATUS</b>"), 0, 3)
+        card_status = self._create_kpi_card(kpi_grid, 3, "SMED GOAL & QUALITY STATUS")
         self.badge_target_status = QLabel("50% TARGET: PENDING")
-        self.badge_target_status.setStyleSheet("background-color: rgba(245, 158, 11, 0.25); color: #FBBF24; font-size: 11px; font-weight: 800; border-radius: 4px; padding: 2px 6px;")
-        kpi_grid.addWidget(self.badge_target_status, 1, 3)
+        self.badge_target_status.setObjectName("dashboardStatusBadge")
+        self.badge_target_status.setProperty("status", "pending")
+        self.badge_target_status.setWordWrap(True)
+        card_status.addWidget(self.badge_target_status)
         self.sub_sixth_part = QLabel("6th OK Approval Part: Pending")
-        self.sub_sixth_part.setStyleSheet("color: #94A3B8; font-size: 11px;")
-        kpi_grid.addWidget(self.sub_sixth_part, 2, 3)
+        self.sub_sixth_part.setObjectName("dashboardKpiSubtext")
+        self.sub_sixth_part.setProperty("status", "pending")
+        self.sub_sixth_part.setWordWrap(True)
+        card_status.addWidget(self.sub_sixth_part)
 
         # Card 5: #1 Bottleneck Solved Spotlight
-        kpi_grid.addWidget(QLabel("<b>#1 BOTTLENECK SOLVED SPOTLIGHT</b>"), 0, 4)
+        card_spotlight = self._create_kpi_card(kpi_grid, 4, "BOTTLENECK SPOTLIGHT")
         self.val_spotlight_name = QLabel("No Bottleneck Solved")
-        self.val_spotlight_name.setStyleSheet("color: #38BDF8; font-size: 13px; font-weight: 800;")
+        self.val_spotlight_name.setObjectName("dashboardKpiValue")
+        self.val_spotlight_name.setProperty("kind", "spotlight")
         self.val_spotlight_name.setWordWrap(True)
-        kpi_grid.addWidget(self.val_spotlight_name, 1, 4)
+        card_spotlight.addWidget(self.val_spotlight_name)
         self.sub_spotlight_sol = QLabel("Awaiting Kaizen verification trials")
-        self.sub_spotlight_sol.setStyleSheet("color: #CBD5E1; font-size: 11px; font-style: italic;")
+        self.sub_spotlight_sol.setObjectName("dashboardKpiSubtext")
         self.sub_spotlight_sol.setWordWrap(True)
-        kpi_grid.addWidget(self.sub_spotlight_sol, 2, 4)
+        card_spotlight.addWidget(self.sub_spotlight_sol)
 
         root_layout.addWidget(kpi_container)
-
-        # =====================================================================
-        # MAIN SPLITTER: Row 2 (Dual Charts) vs Row 3 (Comparative Table)
-        # =====================================================================
-        splitter = QSplitter(Qt.Orientation.Vertical)
-        root_layout.addWidget(splitter, stretch=1)
 
         # ---------------------------------------------------------------------
         # ROW 2: Dual Matplotlib Visual Comparison Canvas
         # ---------------------------------------------------------------------
         charts_box = QGroupBox("Comparative Performance Analytics (Baseline vs. Kaizen Plan vs. Actual Verified)")
+        charts_box.setMinimumWidth(0)
+        charts_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         charts_layout = QVBoxLayout(charts_box)
         charts_layout.setContentsMargins(6, 10, 6, 6)
 
-        self.fig = Figure(facecolor="#1E293B", edgecolor="#334155")
+        self.fig = Figure(facecolor=COLORS["bg_card"], edgecolor=COLORS["border"])
         self.canvas = FigureCanvas(self.fig)
-        self.canvas.setMinimumHeight(230)
+        self.canvas.setMinimumWidth(0)
+        self.canvas.setMinimumHeight(360)
+        self.canvas.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         charts_layout.addWidget(self.canvas)
 
-        splitter.addWidget(charts_box)
+        root_layout.addWidget(charts_box)
 
         # ---------------------------------------------------------------------
         # ROW 3: Comprehensive Activity-by-Activity Comparative Table
         # ---------------------------------------------------------------------
         table_box = QGroupBox("Activity-by-Activity Verification & Plan vs. Actual Performance Matrix")
+        table_box.setMinimumWidth(0)
+        table_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         table_layout = QVBoxLayout(table_box)
         table_layout.setContentsMargins(6, 10, 6, 6)
 
         self.table_compare = QTableWidget()
+        self.table_compare.setObjectName("dashboardComparisonTable")
         self.table_compare.setColumnCount(11)
         self.table_compare.setHorizontalHeaderLabels([
             "Rank",
@@ -190,27 +228,70 @@ class DashboardTab(QWidget):
         ])
 
         header = self.table_compare.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents) # Rank
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents) # Name
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents) # Category Shift
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents) # Before Avg
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)          # Solution
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents) # Est Target
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents) # Actual After
-        header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents) # Time Saved
-        header.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents) # Improve %
-        header.setSectionResizeMode(9, QHeaderView.ResizeMode.ResizeToContents) # Share %
-        header.setSectionResizeMode(10, QHeaderView.ResizeMode.ResizeToContents) # Status
-
+        column_widths = (72, 270, 170, 120, 420, 120, 120, 125, 110, 125, 150)
+        for column, width in enumerate(column_widths):
+            header.setSectionResizeMode(column, QHeaderView.ResizeMode.Interactive)
+            self.table_compare.setColumnWidth(column, width)
+        header.setMinimumHeight(42)
+        header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table_compare.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table_compare.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_compare.setAlternatingRowColors(True)
+        self.table_compare.setMinimumWidth(0)
+        self.table_compare.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+        self.table_compare.setWordWrap(True)
+        self.table_compare.setTextElideMode(Qt.TextElideMode.ElideRight)
+        self.table_compare.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.table_compare.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.table_compare.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.table_compare.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.table_compare.setMinimumHeight(300)
+        self.table_compare.setMaximumHeight(430)
+        self.table_compare.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        self.table_compare.verticalHeader().setDefaultSectionSize(44)
         table_layout.addWidget(self.table_compare)
 
-        splitter.addWidget(table_box)
+        root_layout.addWidget(table_box)
+        root_layout.addStretch(1)
+        self._arrange_kpi_cards()
 
-        # Sizing ratio 45% chart : 55% table
-        splitter.setSizes([310, 390])
+    def _create_kpi_card(self, grid: QGridLayout, column: int, title: str) -> QVBoxLayout:
+        card = QFrame()
+        card.setObjectName("dashboardKpiCard")
+        card.setMinimumHeight(128)
+        self._dashboard_kpi_cards.append(card)
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(7)
+        title_label = QLabel(title)
+        title_label.setObjectName("dashboardKpiTitle")
+        title_label.setWordWrap(True)
+        layout.addWidget(title_label)
+        grid.addWidget(card, 0, column)
+        return layout
+
+    def _arrange_kpi_cards(self):
+        if self._kpi_grid is None or len(self._dashboard_kpi_cards) != 5:
+            return
+
+        columns = 5 if self.width() >= 1360 else 3
+        if columns == self._kpi_columns:
+            return
+
+        for card in self._dashboard_kpi_cards:
+            self._kpi_grid.removeWidget(card)
+
+        for column in range(5):
+            self._kpi_grid.setColumnStretch(column, 1 if column < columns else 0)
+
+        for index, card in enumerate(self._dashboard_kpi_cards):
+            row, column = divmod(index, columns)
+            self._kpi_grid.addWidget(card, row, column)
+        self._kpi_columns = columns
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._arrange_kpi_cards()
 
     # =========================================================================
     # PROJECT SETTING & DATA REFRESH
@@ -221,11 +302,13 @@ class DashboardTab(QWidget):
         self.active_project_id = project_id
         project = self.db.get_project(project_id)
         if project:
-            self.lbl_project_title.setText(
-                f"{project['name']}  ({project.get('machine_name') or 'Machine'})"
+            self.lbl_project_title.setText(project["name"])
+            self.lbl_project_title.setToolTip(
+                f"{project['name']} - {project.get('machine_name') or 'Machine'}"
             )
         else:
             self.lbl_project_title.setText("Unknown Project")
+            self.lbl_project_title.setToolTip("Unknown Project")
 
         self.refresh_analytics()
 
@@ -266,8 +349,9 @@ class DashboardTab(QWidget):
         self.val_kpi_external.setText("00m 00s -> 00m 00s")
         self.sub_kpi_external.setText("0 activities shifted outside downtime")
         self.badge_target_status.setText("STATUS: NO DATA")
-        self.badge_target_status.setStyleSheet("background-color: rgba(148, 163, 184, 0.2); color: #CBD5E1; font-size: 11px; font-weight: 800; border-radius: 4px; padding: 2px 6px;")
+        self._set_dashboard_status(self.badge_target_status, "pending")
         self.sub_sixth_part.setText("6th OK Approval Part: Pending")
+        self._set_dashboard_status(self.sub_sixth_part, "pending")
         self.val_spotlight_name.setText("No Data")
         self.sub_spotlight_sol.setText("Awaiting trials")
 
@@ -317,23 +401,23 @@ class DashboardTab(QWidget):
         if rep["after_trials_count"] > 0:
             if rep["target_achieved"]:
                 self.badge_target_status.setText(f"[50% TARGET ACHIEVED] (-{pct_tot:.1f}%)")
-                self.badge_target_status.setStyleSheet("background-color: rgba(16, 185, 129, 0.25); color: #34D399; font-size: 11px; font-weight: 800; border: 1px solid #10B981; border-radius: 4px; padding: 2px 6px;")
+                self._set_dashboard_status(self.badge_target_status, "success")
             else:
                 self.badge_target_status.setText(f"[TARGET IN PROGRESS] (-{pct_tot:.1f}%)")
-                self.badge_target_status.setStyleSheet("background-color: rgba(245, 158, 11, 0.25); color: #FBBF24; font-size: 11px; font-weight: 800; border: 1px solid #F59E0B; border-radius: 4px; padding: 2px 6px;")
+                self._set_dashboard_status(self.badge_target_status, "warning")
 
             sixth_verified = rep.get("all_sixth_ok_verified", False)
             if sixth_verified:
                 self.sub_sixth_part.setText("6th OK Part: VERIFIED ON ALL TRIALS")
-                self.sub_sixth_part.setStyleSheet("color: #34D399; font-weight: 700; font-size: 11px;")
+                self._set_dashboard_status(self.sub_sixth_part, "success")
             else:
                 self.sub_sixth_part.setText("6th OK Part: Quality Signoff Pending")
-                self.sub_sixth_part.setStyleSheet("color: #F87171; font-weight: 700; font-size: 11px;")
+                self._set_dashboard_status(self.sub_sixth_part, "warning")
         else:
             self.badge_target_status.setText("STATUS: AWAITING AFTER TRIALS")
-            self.badge_target_status.setStyleSheet("background-color: rgba(148, 163, 184, 0.2); color: #CBD5E1; font-size: 11px; font-weight: 800; border-radius: 4px; padding: 2px 6px;")
+            self._set_dashboard_status(self.badge_target_status, "pending")
             self.sub_sixth_part.setText("6th OK Part: Not Verified Yet")
-            self.sub_sixth_part.setStyleSheet("color: #94A3B8; font-size: 11px;")
+            self._set_dashboard_status(self.sub_sixth_part, "pending")
 
         # Card 5: #1 Bottleneck Solved Spotlight
         top_spot = rep.get("top_spotlight")
@@ -347,23 +431,31 @@ class DashboardTab(QWidget):
             self.val_spotlight_name.setText("Top Bottleneck: Pending Verification")
             self.sub_spotlight_sol.setText("Record After video trials to confirm time savings")
 
+    @staticmethod
+    def _set_dashboard_status(widget: QWidget, status: str):
+        widget.setProperty("status", status)
+        widget.style().unpolish(widget)
+        widget.style().polish(widget)
+        widget.update()
+
     # =========================================================================
     # ROW 2: DUAL MATPLOTLIB VISUAL COMPARISON CANVAS
     # =========================================================================
 
     def _render_empty_canvas(self, message: str):
         self.fig.clear()
+        self.fig.set_facecolor(COLORS["bg_card"])
         ax = self.fig.add_subplot(111)
-        ax.set_facecolor("#0F172A")
+        ax.set_facecolor(COLORS["bg_card"])
         ax.text(
             0.5, 0.5, message,
-            color="#94A3B8", fontsize=12, fontweight="bold",
+            color=COLORS["text_secondary"], fontsize=12, fontweight="bold",
             ha="center", va="center", transform=ax.transAxes
         )
         ax.set_xticks([])
         ax.set_yticks([])
         for spine in ax.spines.values():
-            spine.set_color("#334155")
+            spine.set_color(COLORS["border"])
         self.canvas.draw()
 
     def _render_dual_comparison_charts(self, rep: Dict[str, Any]):
@@ -375,32 +467,38 @@ class DashboardTab(QWidget):
           for the top bottleneck activities.
         """
         self.fig.clear()
+        self.fig.set_facecolor(COLORS["bg_card"])
 
         # 2 Subplots side-by-side
         ax1 = self.fig.add_subplot(121)
         ax2 = self.fig.add_subplot(122)
 
         for ax in (ax1, ax2):
-            ax.set_facecolor("#0F172A")
+            ax.set_facecolor(COLORS["bg_card"])
             for spine in ax.spines.values():
-                spine.set_color("#334155")
-            ax.grid(True, linestyle="--", alpha=0.2, color="#475569")
+                spine.set_color(COLORS["border"])
+            ax.grid(True, linestyle="--", alpha=0.4, color=COLORS["border"])
 
         # ---------------------------------------------------------------------
         # SUBPLOT 1: Macro Setup Breakdown (Stacked Bar)
         # ---------------------------------------------------------------------
         macro = rep.get("macro_breakdown", {})
-        categories = ["Baseline (Before)", "Kaizen Plan", "Actual (After)"]
+        actual_verified = rep.get("after_trials_count", 0) > 0
+        categories = [
+            "Baseline (Before)",
+            "Kaizen Plan",
+            "Actual (After)" if actual_verified else "Actual (Pending)",
+        ]
 
         int_times = [
             macro.get("before_internal_sec", 0.0),
             macro.get("projected_internal_sec", 0.0),
-            macro.get("after_internal_sec", 0.0),
+            macro.get("after_internal_sec", 0.0) if actual_verified else np.nan,
         ]
         ext_times = [
             macro.get("before_external_sec", 0.0),
             macro.get("projected_external_sec", 0.0),
-            macro.get("after_external_sec", 0.0),
+            macro.get("after_external_sec", 0.0) if actual_verified else np.nan,
         ]
 
         x_pos = np.arange(len(categories))
@@ -410,12 +508,12 @@ class DashboardTab(QWidget):
         bars_int = ax1.bar(
             x_pos, int_times, width,
             label="Internal (Machine OFF)",
-            color="#EF4444", edgecolor="#334155", zorder=3
+            color=COLORS["internal_red"], edgecolor=COLORS["bg_card"], zorder=3
         )
         bars_ext = ax1.bar(
             x_pos, ext_times, width, bottom=int_times,
             label="External (Machine ON)",
-            color="#10B981", edgecolor="#334155", zorder=3
+            color=COLORS["external_emerald"], edgecolor=COLORS["bg_card"], zorder=3
         )
 
         # Total duration labels on top
@@ -427,27 +525,48 @@ class DashboardTab(QWidget):
                     xy=(x_pos[i], tot),
                     xytext=(0, 4), textcoords="offset points",
                     ha="center", va="bottom",
-                    color="#F8FAFC", fontsize=9, fontweight="bold"
+                    color=COLORS["text_primary"], fontsize=9, fontweight="bold"
                 )
+        max_total = max((internal + external for internal, external in zip(int_times, ext_times)), default=0.0)
+        if max_total > 0:
+            ax1.set_ylim(top=max_total * 1.4)
 
         # 50% Target Threshold line
         target_thresh = macro.get("target_threshold_sec", 0.0)
         if target_thresh > 0:
             ax1.axhline(
                 target_thresh,
-                color="#F59E0B", linestyle="--", linewidth=1.8, zorder=4,
+                color=COLORS["warning_amber"], linestyle="--", linewidth=1.8, zorder=4,
                 label=f"50% Target Threshold ({format_duration(target_thresh)})"
             )
+        if not actual_verified:
+            ax1.text(
+                x_pos[2],
+                0.5,
+                "AFTER TRIALS\nNOT VERIFIED",
+                transform=ax1.get_xaxis_transform(),
+                ha="center",
+                va="center",
+                color=COLORS["warning_amber"],
+                fontsize=8,
+                fontweight="bold",
+                bbox={"facecolor": "#FFF4D6", "edgecolor": "#E8C46A", "boxstyle": "round,pad=0.35"},
+            )
 
-        ax1.set_title("Macro Setup Duration Breakdown", color="#38BDF8", fontsize=11, fontweight="bold")
-        ax1.set_ylabel("Duration (Seconds)", color="#F8FAFC", fontsize=9, fontweight="bold")
+        ax1.set_title("Macro Setup Duration Breakdown", color=COLORS["deep_navy"], fontsize=11, fontweight="bold")
+        ax1.set_ylabel("Duration (Seconds)", color=COLORS["text_primary"], fontsize=9, fontweight="bold")
         ax1.set_xticks(x_pos)
-        ax1.set_xticklabels(categories, color="#E2E8F0", fontsize=9, fontweight="bold")
-        ax1.tick_params(colors="#F8FAFC", labelsize=9)
+        ax1.set_xticklabels(categories, color=COLORS["text_primary"], fontsize=9, fontweight="bold")
+        ax1.tick_params(colors=COLORS["text_secondary"], labelsize=9)
 
-        leg1 = ax1.legend(loc="upper right", facecolor="#1E293B", edgecolor="#334155", fontsize=8)
+        leg1 = ax1.legend(
+            loc="upper right",
+            facecolor=COLORS["bg_card_elevated"],
+            edgecolor=COLORS["border"],
+            fontsize=8,
+        )
         for text in leg1.get_texts():
-            text.set_color("#F8FAFC")
+            text.set_color(COLORS["text_primary"])
 
         # ---------------------------------------------------------------------
         # SUBPLOT 2: Activity-by-Activity Before vs. After (Top Bottlenecks)
@@ -459,7 +578,10 @@ class DashboardTab(QWidget):
                 for it in activities
             ]
             before_vals = [it["before_avg_sec"] for it in activities]
-            after_vals = [it["after_avg_sec"] for it in activities]
+            after_vals = [
+                it["after_avg_sec"] if actual_verified else np.nan
+                for it in activities
+            ]
 
             y_pos = np.arange(len(act_names))
             h_bar = 0.36
@@ -471,15 +593,18 @@ class DashboardTab(QWidget):
 
             bars_b = ax2.barh(
                 y_pos + h_bar / 2, before_vals, h_bar,
-                label="Before Avg", color="#475569", edgecolor="#334155", zorder=3
+                label="Before Avg", color="#9AAABD", edgecolor=COLORS["bg_card"], zorder=3
             )
+            after_label = "After Avg" if actual_verified else "After Avg (Pending)"
             bars_a = ax2.barh(
                 y_pos - h_bar / 2, after_vals, h_bar,
-                label="After Avg", color="#0EA5E9", edgecolor="#334155", zorder=3
+                label=after_label, color=COLORS["primary_blue"], edgecolor=COLORS["bg_card"], zorder=3
             )
 
             # Annotation labels
             for idx, rect in enumerate(bars_a):
+                if not actual_verified:
+                    continue
                 diff = before_vals[idx] - after_vals[idx]
                 if diff > 0 and before_vals[idx] > 0:
                     pct = (diff / before_vals[idx]) * 100
@@ -488,18 +613,40 @@ class DashboardTab(QWidget):
                         xy=(rect.get_width(), rect.get_y() + rect.get_height() / 2),
                         xytext=(4, 0), textcoords="offset points",
                         ha="left", va="center",
-                        color="#10B981", fontsize=8, fontweight="bold"
+                        color=COLORS["external_emerald"], fontsize=8, fontweight="bold"
                     )
 
-            ax2.set_title("Top Bottlenecks: Before vs. After Duration", color="#38BDF8", fontsize=11, fontweight="bold")
-            ax2.set_xlabel("Seconds", color="#F8FAFC", fontsize=9, fontweight="bold")
+            ax2.set_title(
+                "Top Bottlenecks: Before vs. After\nDuration",
+                color=COLORS["deep_navy"],
+                fontsize=11,
+                fontweight="bold",
+            )
+            ax2.set_xlabel("Seconds", color=COLORS["text_primary"], fontsize=9, fontweight="bold")
             ax2.set_yticks(y_pos)
-            ax2.set_yticklabels(act_names, color="#E2E8F0", fontsize=8)
-            ax2.tick_params(colors="#F8FAFC", labelsize=8)
+            ax2.set_yticklabels(act_names, color=COLORS["text_primary"], fontsize=8)
+            ax2.tick_params(colors=COLORS["text_secondary"], labelsize=8)
+            if not actual_verified:
+                ax2.text(
+                    0.98,
+                    0.04,
+                    "After trials not verified",
+                    transform=ax2.transAxes,
+                    ha="right",
+                    va="bottom",
+                    color=COLORS["warning_amber"],
+                    fontsize=8,
+                    fontweight="bold",
+                )
 
-            leg2 = ax2.legend(loc="lower right", facecolor="#1E293B", edgecolor="#334155", fontsize=8)
+            leg2 = ax2.legend(
+                loc="lower right",
+                facecolor=COLORS["bg_card_elevated"],
+                edgecolor=COLORS["border"],
+                fontsize=8,
+            )
             for text in leg2.get_texts():
-                text.set_color("#F8FAFC")
+                text.set_color(COLORS["text_primary"])
 
         self.fig.tight_layout()
         self.canvas.draw()
@@ -512,9 +659,11 @@ class DashboardTab(QWidget):
         """Populate activity-by-activity comparative table with badges."""
         self.table_compare.setRowCount(0)
         activities = rep.get("activities_list", [])
+        actual_verified = rep.get("after_trials_count", 0) > 0
 
         for row_idx, item in enumerate(activities):
             self.table_compare.insertRow(row_idx)
+            self.table_compare.setRowHeight(row_idx, 48)
 
             # 1. Rank
             rank_item = QTableWidgetItem(f"#{item.get('baseline_rank', row_idx + 1)}")
@@ -524,17 +673,20 @@ class DashboardTab(QWidget):
             # 2. Activity Name
             name_item = QTableWidgetItem(item["activity_name"])
             name_item.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+            name_item.setToolTip(item["activity_name"])
             self.table_compare.setItem(row_idx, 1, name_item)
 
             # 3. Category Shift Badge
-            shift_label = QLabel(f" {item.get('category_shift', '')} ")
+            category_shift = (
+                item.get("category_shift", "")
+                if actual_verified
+                else f"{item.get('before_type', 'Baseline')} -> Pending"
+            )
+            shift_label = QLabel(f" {category_shift} ")
             shift_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            if item.get("is_converted"):
-                shift_label.setStyleSheet(
-                    "background-color: rgba(16, 185, 129, 0.25); color: #34D399; font-weight: 800; "
-                    "border: 1px solid #10B981; border-radius: 4px; padding: 2px 6px;"
-                )
-            elif "Internal" in item.get("category_shift", ""):
+            if actual_verified and item.get("is_converted"):
+                shift_label.setStyleSheet(get_external_badge_style())
+            elif "Internal" in category_shift:
                 shift_label.setStyleSheet(get_internal_badge_style())
             else:
                 shift_label.setStyleSheet(get_external_badge_style())
@@ -547,50 +699,71 @@ class DashboardTab(QWidget):
 
             # 5. Kaizen Solution Implemented
             sol_item = QTableWidgetItem(item.get("solution_implemented") or "—")
+            sol_item.setToolTip(item.get("solution_implemented") or "No countermeasure recorded.")
             self.table_compare.setItem(row_idx, 4, sol_item)
 
             # 6. Est. Target (s)
             est_item = QTableWidgetItem(f"{item.get('est_target_sec', 0.0):.1f}")
             est_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            est_item.setForeground(QColor("#94A3B8"))
+            est_item.setForeground(QColor(COLORS["text_muted"]))
             self.table_compare.setItem(row_idx, 5, est_item)
 
             # 7. Actual After (s)
-            a_item = QTableWidgetItem(f"{item['after_avg_sec']:.1f}")
+            a_item = QTableWidgetItem(
+                f"{item['after_avg_sec']:.1f}" if actual_verified else "Pending"
+            )
             a_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            a_item.setForeground(QColor("#38BDF8"))
+            a_item.setForeground(QColor(
+                COLORS["primary_blue_pressed"] if actual_verified else COLORS["text_muted"]
+            ))
             a_item.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
             self.table_compare.setItem(row_idx, 6, a_item)
 
             # 8. Time Saved (s)
             saved_sec = item["reduction_sec"]
-            saved_item = QTableWidgetItem(f"{saved_sec:.1f}")
+            saved_item = QTableWidgetItem(f"{saved_sec:.1f}" if actual_verified else "Pending")
             saved_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            saved_item.setForeground(QColor("#10B981" if saved_sec > 0 else "#94A3B8"))
+            saved_item.setForeground(QColor(
+                COLORS["external_emerald"] if actual_verified and saved_sec > 0 else COLORS["text_muted"]
+            ))
             saved_item.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
             self.table_compare.setItem(row_idx, 7, saved_item)
 
             # 9. Improvement %
-            pct_item = QTableWidgetItem(f"{item['reduction_pct']:.1f}%")
+            pct_item = QTableWidgetItem(
+                f"{item['reduction_pct']:.1f}%" if actual_verified else "Pending"
+            )
             pct_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            pct_item.setForeground(QColor("#10B981" if item["reduction_pct"] > 0 else "#94A3B8"))
+            pct_item.setForeground(QColor(
+                COLORS["external_emerald"]
+                if actual_verified and item["reduction_pct"] > 0
+                else COLORS["text_muted"]
+            ))
             self.table_compare.setItem(row_idx, 8, pct_item)
 
             # 10. Share of Total Savings %
-            share_item = QTableWidgetItem(f"{item.get('savings_share_pct', 0.0):.1f}%")
+            share_item = QTableWidgetItem(
+                f"{item.get('savings_share_pct', 0.0):.1f}%" if actual_verified else "Pending"
+            )
             share_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self.table_compare.setItem(row_idx, 9, share_item)
 
             # 11. Plan vs Actual Status Badge
-            status_text = item.get("plan_vs_actual_status") or "On Target"
+            status_text = (
+                item.get("plan_vs_actual_status") or "On Target"
+                if actual_verified
+                else "Pending Verification"
+            )
             status_label = QLabel(f" {status_text} ")
+            status_label.setObjectName("dashboardPlanStatus")
             status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             if "Beat" in status_text:
-                status_label.setStyleSheet("background-color: rgba(16, 185, 129, 0.2); color: #34D399; font-weight: 700; border-radius: 4px; padding: 2px 4px;")
+                status = "success"
             elif "On Target" in status_text:
-                status_label.setStyleSheet("background-color: rgba(14, 165, 233, 0.2); color: #38BDF8; font-weight: 700; border-radius: 4px; padding: 2px 4px;")
+                status = "onTarget"
             else:
-                status_label.setStyleSheet("background-color: rgba(245, 158, 11, 0.2); color: #FBBF24; font-weight: 700; border-radius: 4px; padding: 2px 4px;")
+                status = "warning"
+            status_label.setProperty("status", status)
             self.table_compare.setCellWidget(row_idx, 10, status_label)
 
     # =========================================================================

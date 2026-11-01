@@ -89,8 +89,8 @@ def test_pareto_kaizen():
     print(f"     Updated Projected: {tab.val_kpi_projected.text()} -> {tab.badge_kpi_status.text()}")
 
     # 6. Test Batch Save Kaizen Solutions
-    r0["edit_problem"].setText("Bolts stick due to thermal expansion")
-    r0["edit_solution"].setText("Hydraulic one-touch quick clamps installed")
+    r0["edit_problem"].setPlainText("Bolts stick due to thermal expansion")
+    r0["edit_solution"].setPlainText("Hydraulic one-touch quick clamps installed")
     tab._save_all_kaizen_solutions()
 
     # Verify SQLite persistence

@@ -6,13 +6,14 @@ and continuous zero-gap dual-stopwatch timing with standardized activity diction
 """
 
 import os
+import time
 import cv2
 from typing import Any, Dict, List, Optional
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QTime
 from PyQt6.QtGui import QImage, QPixmap, QKeySequence, QShortcut, QColor
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel,
-    QLineEdit, QComboBox, QCompleter, QRadioButton, QButtonGroup,
+    QLineEdit, QTextEdit, QComboBox, QCompleter, QRadioButton, QButtonGroup,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QGroupBox, QSlider, QFileDialog, QMessageBox, QFrame,
     QSplitter, QCheckBox, QAbstractItemView
@@ -41,7 +42,10 @@ class VideoCanvas(QLabel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setStyleSheet("background-color: #080D15; border: 1px solid #1E293B; border-radius: 8px;")
+        self.setStyleSheet(
+            "background-color: #080D15; color: #CBD5E1; "
+            "border: 1px solid #1E293B; border-radius: 8px;"
+        )
         self.setMinimumSize(420, 280)
         self._current_pixmap: Optional[QPixmap] = None
 
@@ -91,8 +95,8 @@ class VideoLoggerTab(QWidget):
         self.live_timer = QTimer(self)
         self.live_timer.timeout.connect(self._on_live_tick)
         self.master_running: bool = False
-        self.master_start_timestamp: float = 0.0
         self.master_accumulated_sec: float = 0.0
+        self._last_live_tick_time: Optional[float] = None
 
         # Activity Lap Timing state
         self.lap_running: bool = False
@@ -113,21 +117,25 @@ class VideoLoggerTab(QWidget):
         # TOP TOOLBAR: Project Indicator, Phase Toggle, Multi-Video Import
         # =====================================================================
         top_bar = QFrame()
-        top_bar.setStyleSheet("background-color: #1E293B; border-radius: 6px; padding: 6px;")
+        top_bar.setObjectName("videoToolbar")
         top_layout = QHBoxLayout(top_bar)
         top_layout.setContentsMargins(8, 4, 8, 4)
         top_layout.setSpacing(12)
 
         # Project Name Badge
-        top_layout.addWidget(QLabel("<b>Active Project:</b>"))
+        active_project_label = QLabel("<b>Active Project:</b>")
+        active_project_label.setObjectName("videoToolbarLabel")
+        top_layout.addWidget(active_project_label)
         self.lbl_active_project = QLabel("No Project Selected")
-        self.lbl_active_project.setStyleSheet("color: #38BDF8; font-weight: 700; font-size: 14px;")
+        self.lbl_active_project.setObjectName("videoActiveProject")
         top_layout.addWidget(self.lbl_active_project)
 
         top_layout.addSpacing(16)
 
         # Phase Selector
-        top_layout.addWidget(QLabel("<b>Study Phase:</b>"))
+        phase_label = QLabel("<b>Study Phase:</b>")
+        phase_label.setObjectName("videoToolbarLabel")
+        top_layout.addWidget(phase_label)
         self.combo_phase = QComboBox()
         self.combo_phase.addItems(["BEFORE (Baseline Observation)", "AFTER (Kaizen Verification)"])
         self.combo_phase.currentIndexChanged.connect(self._on_phase_changed)
@@ -146,12 +154,17 @@ class VideoLoggerTab(QWidget):
         self.btn_demo_videos = QPushButton("🎬 Demo SMED Videos")
         self.btn_demo_videos.setObjectName("accentBtn")
         self.btn_demo_videos.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_demo_videos.setToolTip("Generate synthetic shop-floor simulation videos and load demo trial")
+        self.btn_demo_videos.setToolTip(
+            "Generate accelerated simulation animations for exploring the workflow; "
+            "these are not real shop-floor recordings."
+        )
         self.btn_demo_videos.clicked.connect(self._on_generate_demo_videos)
         top_layout.addWidget(self.btn_demo_videos)
 
         # Trial Selector Dropdown
-        top_layout.addWidget(QLabel("<b>Active Trial:</b>"))
+        trial_label = QLabel("<b>Active Trial:</b>")
+        trial_label.setObjectName("videoToolbarLabel")
+        top_layout.addWidget(trial_label)
         self.combo_trials = QComboBox()
         self.combo_trials.setMinimumWidth(220)
         self.combo_trials.currentIndexChanged.connect(self._on_trial_selected)
@@ -189,9 +202,19 @@ class VideoLoggerTab(QWidget):
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(8)
 
+        self.lbl_video_guidance = QLabel(
+            "Laps follow video playback; without a video, starting a lap starts the manual clock. Demo videos are simulated."
+        )
+        self.lbl_video_guidance.setObjectName("videoGuidance")
+        self.lbl_video_guidance.setWordWrap(True)
+        left_layout.addWidget(self.lbl_video_guidance)
+
         # Video Canvas
         self.video_canvas = VideoCanvas()
-        self._show_canvas_placeholder("No Video Loaded\n(Operating in Live Manual Dual-Stopwatch Mode)")
+        self._show_canvas_placeholder(
+            "No video loaded\nImport shop-floor footage to review and time activities.\n"
+            "Demo videos are accelerated simulations, not real footage."
+        )
         left_layout.addWidget(self.video_canvas, stretch=1)
 
         # Timeline Seek Slider & Timestamp readout
@@ -199,7 +222,7 @@ class VideoLoggerTab(QWidget):
         timeline_layout.setSpacing(10)
 
         self.lbl_time_display = QLabel("00:00.00 / 00:00.00")
-        self.lbl_time_display.setStyleSheet("font-family: monospace; font-size: 13px; color: #38BDF8; font-weight: 700;")
+        self.lbl_time_display.setObjectName("videoTimeline")
         timeline_layout.addWidget(self.lbl_time_display)
 
         self.slider_seek = QSlider(Qt.Orientation.Horizontal)
@@ -239,7 +262,7 @@ class VideoLoggerTab(QWidget):
         controls_layout.addStretch()
 
         self.lbl_video_info = QLabel("No Video")
-        self.lbl_video_info.setStyleSheet("color: #64748B; font-size: 11px;")
+        self.lbl_video_info.setObjectName("videoInfo")
         controls_layout.addWidget(self.lbl_video_info)
 
         left_layout.addLayout(controls_layout)
@@ -260,19 +283,29 @@ class VideoLoggerTab(QWidget):
         stopwatch_layout.setVerticalSpacing(8)
 
         # Stopwatch 1: Master SMED Stopwatch
-        stopwatch_layout.addWidget(QLabel("<b>MASTER SMED STOPWATCH</b><br><small style='color:#94A3B8;'>Last Good Part → 6th OK Part</small>"), 0, 0)
+        master_caption = QLabel("<b>MASTER SMED STOPWATCH</b><br><small>Overall changeover elapsed time</small>")
+        master_caption.setObjectName("stopwatchCaption")
+        stopwatch_layout.addWidget(master_caption, 0, 0)
         self.lbl_master_time = QLabel("00:00.00")
+        self.lbl_master_time.setToolTip(
+            "Overall trial time. Start Master to run it manually, or sync it to the current video position."
+        )
         self.lbl_master_time.setStyleSheet(get_digital_readout_style(font_size_pt=20, text_color="#38BDF8"))
         self.lbl_master_time.setAlignment(Qt.AlignmentFlag.AlignCenter)
         stopwatch_layout.addWidget(self.lbl_master_time, 1, 0)
 
         master_btn_layout = QHBoxLayout()
         self.btn_master_toggle = QPushButton("Start Master")
+        self.btn_master_toggle.setToolTip(
+            "Start or pause the overall manual elapsed-time stopwatch. "
+            "Starting an activity lap auto-starts it when no video is loaded."
+        )
         self.btn_master_toggle.clicked.connect(self._toggle_master_timer)
         master_btn_layout.addWidget(self.btn_master_toggle)
 
         self.btn_master_sync = QPushButton("Sync to Video")
-        self.btn_master_sync.setToolTip("Set Master SMED stopwatch to current video playback timestamp.")
+        self.btn_master_sync.setEnabled(False)
+        self.btn_master_sync.setToolTip("Set the master timer to the current video position.")
         self.btn_master_sync.clicked.connect(self._sync_master_to_video)
         master_btn_layout.addWidget(self.btn_master_sync)
 
@@ -285,7 +318,11 @@ class VideoLoggerTab(QWidget):
         stopwatch_layout.addLayout(master_btn_layout, 2, 0)
 
         # Stopwatch 2: Activity Lap Stopwatch
-        stopwatch_layout.addWidget(QLabel("<b>ACTIVITY LAP STOPWATCH</b><br><small style='color:#94A3B8;'>Micro-Activity Interval Timer</small>"), 0, 1)
+        lap_caption = QLabel(
+            "<b>ACTIVITY LAP STOPWATCH</b><br><small>One activity interval; uses video or manual time</small>"
+        )
+        lap_caption.setObjectName("stopwatchCaption")
+        stopwatch_layout.addWidget(lap_caption, 0, 1)
         self.lbl_lap_time = QLabel("00:00.00")
         self.lbl_lap_time.setStyleSheet(get_digital_readout_style(font_size_pt=20, text_color="#10B981"))
         self.lbl_lap_time.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -293,7 +330,7 @@ class VideoLoggerTab(QWidget):
 
         lap_info_layout = QHBoxLayout()
         self.lbl_lap_status = QLabel("Status: Idle (Press 'S' to Start)")
-        self.lbl_lap_status.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        self.lbl_lap_status.setObjectName("lapStatus")
         lap_info_layout.addWidget(self.lbl_lap_status)
 
         self.btn_cancel_lap = QPushButton("Cancel Lap")
@@ -327,12 +364,12 @@ class VideoLoggerTab(QWidget):
 
         self.radio_group = QButtonGroup(self)
         self.radio_internal = QRadioButton(" INTERNAL (Machine Stopped) [I]")
-        self.radio_internal.setStyleSheet("color: #F87171; font-weight: 700;")
+        self.radio_internal.setObjectName("internalRadio")
         self.radio_group.addButton(self.radio_internal, 1)
         bifurcation_row.addWidget(self.radio_internal)
 
         self.radio_external = QRadioButton(" EXTERNAL (Machine Running) [E]")
-        self.radio_external.setStyleSheet("color: #34D399; font-weight: 700;")
+        self.radio_external.setObjectName("externalRadio")
         self.radio_group.addButton(self.radio_external, 2)
         bifurcation_row.addWidget(self.radio_external)
         self.radio_internal.setChecked(True)
@@ -368,7 +405,8 @@ class VideoLoggerTab(QWidget):
         ])
         self.table_logs.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table_logs.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        self.table_logs.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.table_logs.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        self.table_logs.setColumnWidth(2, 136)
         self.table_logs.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         self.table_logs.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         self.table_logs.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
@@ -380,30 +418,30 @@ class VideoLoggerTab(QWidget):
 
         # Subtotal Bar
         subtotal_bar = QFrame()
-        subtotal_bar.setStyleSheet("background-color: #0F172A; border-radius: 4px; padding: 6px 12px;")
+        subtotal_bar.setObjectName("videoSubtotalBar")
         subtotal_layout = QHBoxLayout(subtotal_bar)
         subtotal_layout.setContentsMargins(4, 2, 4, 2)
 
         self.lbl_subtotal_internal = QLabel("Internal: 00:00 (0.0s)")
-        self.lbl_subtotal_internal.setStyleSheet("color: #FCA5A5; font-weight: 700;")
+        self.lbl_subtotal_internal.setObjectName("subtotalInternal")
         subtotal_layout.addWidget(self.lbl_subtotal_internal)
 
         subtotal_layout.addSpacing(16)
 
         self.lbl_subtotal_external = QLabel("External: 00:00 (0.0s)")
-        self.lbl_subtotal_external.setStyleSheet("color: #6EE7B7; font-weight: 700;")
+        self.lbl_subtotal_external.setObjectName("subtotalExternal")
         subtotal_layout.addWidget(self.lbl_subtotal_external)
 
         subtotal_layout.addSpacing(16)
 
         self.lbl_subtotal_total = QLabel("Total Sum: 00:00 (0.0s)")
-        self.lbl_subtotal_total.setStyleSheet("color: #38BDF8; font-weight: 700;")
+        self.lbl_subtotal_total.setObjectName("subtotalTotal")
         subtotal_layout.addWidget(self.lbl_subtotal_total)
 
         subtotal_layout.addStretch()
 
         self.lbl_subtotal_count = QLabel("0 Activities Logged")
-        self.lbl_subtotal_count.setStyleSheet("color: #94A3B8; font-style: italic;")
+        self.lbl_subtotal_count.setObjectName("subtotalCount")
         subtotal_layout.addWidget(self.lbl_subtotal_count)
 
         table_layout.addWidget(subtotal_bar)
@@ -527,6 +565,9 @@ class VideoLoggerTab(QWidget):
             self._select_trial(trials[0]["id"])
         else:
             self.active_trial_id = None
+            self._reset_timers_for_trial()
+            self.master_accumulated_sec = 0.0
+            self.lbl_master_time.setText("00:00.00")
             self._close_video()
             self._load_activity_logs()
             self._show_canvas_placeholder(
@@ -542,6 +583,7 @@ class VideoLoggerTab(QWidget):
 
     def _select_trial(self, trial_id: int):
         """Load selected trial, open its video if present, and load its activity logs."""
+        self._reset_timers_for_trial()
         self.active_trial_id = trial_id
         trial = self.db.get_video_trial(trial_id)
         if not trial:
@@ -556,6 +598,10 @@ class VideoLoggerTab(QWidget):
         saved_duration = float(trial.get("total_smed_duration_sec", 0.0))
         self.master_accumulated_sec = saved_duration
         self.lbl_master_time.setText(format_seconds(saved_duration))
+        self.lbl_master_time.setToolTip(
+            f"Loaded saved trial duration: {format_seconds(saved_duration)}. "
+            "Start Master to continue manually or Sync to Video to set the current playback position."
+        )
 
         # Open video file if exists
         video_path = trial.get("file_path")
@@ -564,7 +610,8 @@ class VideoLoggerTab(QWidget):
         else:
             self._close_video()
             self._show_canvas_placeholder(
-                f"Live Stopwatch Mode\n(Video file '{os.path.basename(video_path or '')}' not found or offline)"
+                f"Manual timing mode\nVideo file '{os.path.basename(video_path or '')}' was not found or is offline.\n"
+                "Start Master, then start an activity lap."
             )
 
         # Load logged activities table
@@ -656,6 +703,8 @@ class VideoLoggerTab(QWidget):
                 self,
                 "Demo SMED Videos Loaded",
                 "Successfully generated shop-floor simulation videos in 'sample_videos/'!\n\n"
+                "These are accelerated animations for learning the workflow, not real shop-floor footage. "
+                "Import an actual recording for a real time study.\n\n"
                 "• Baseline Trial #1 (BEFORE): Unoptimized changeover with high manual waste.\n"
                 "• Kaizen Trial #1 (AFTER): Standardized quick-clamping & laser alignment.\n\n"
                 "Controls:\n"
@@ -675,7 +724,7 @@ class VideoLoggerTab(QWidget):
     def _show_canvas_placeholder(self, text: str):
         self.video_canvas.setText(text)
         self.video_canvas.setStyleSheet(
-            "background-color: #080D15; color: #94A3B8; font-size: 14px; font-weight: 600; "
+            "background-color: #080D15; color: #CBD5E1; font-size: 14px; font-weight: 600; "
             "border: 1px solid #1E293B; border-radius: 8px;"
         )
 
@@ -685,15 +734,30 @@ class VideoLoggerTab(QWidget):
 
         self.cap = cv2.VideoCapture(filepath)
         if not self.cap.isOpened():
-            self._show_canvas_placeholder(f"Failed to open video:\n{os.path.basename(filepath)}")
+            self.cap.release()
+            self.cap = None
+            self._show_canvas_placeholder(
+                f"Could not open video\n{os.path.basename(filepath)}\n"
+                "Check that the file is a supported video format."
+            )
+            self.btn_master_sync.setEnabled(False)
             return
 
+        self.btn_master_sync.setEnabled(True)
+        self.btn_master_toggle.setToolTip(
+            "Run or pause the overall manual elapsed-time stopwatch. "
+            "Activity Lap uses video playback position while a video is loaded."
+        )
         self.video_fps = self.cap.get(cv2.CAP_PROP_FPS) or 30.0
         self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
         self.video_duration_sec = self.total_frames / self.video_fps if self.video_fps > 0 else 0.0
 
         filename = os.path.basename(filepath)
         self.lbl_video_info.setText(f"{filename} | {self.video_fps:.1f} FPS | {format_seconds(self.video_duration_sec)}")
+        self.lbl_video_info.setToolTip(
+            f"Loaded study video: {filepath}\n"
+            "Activity start/end times use the video playback position."
+        )
 
         # Read first frame
         self._render_current_frame()
@@ -707,6 +771,14 @@ class VideoLoggerTab(QWidget):
         self.total_frames = 0
         self.video_duration_sec = 0.0
         self.lbl_video_info.setText("No Video Loaded")
+        self.lbl_video_info.setToolTip(
+            "Import shop-floor footage to review it. Without a video, activity timing uses the manual master timer."
+        )
+        self.btn_master_sync.setEnabled(False)
+        self.btn_master_toggle.setToolTip(
+            "Start or pause the overall manual elapsed-time stopwatch. "
+            "Starting an activity lap auto-starts it when no video is loaded."
+        )
         self.lbl_time_display.setText("00:00.00 / 00:00.00")
         self.slider_seek.setValue(0)
 
@@ -721,6 +793,8 @@ class VideoLoggerTab(QWidget):
             return
         self.is_playing = True
         self.btn_play_pause.setText("⏸ Pause (Space)")
+        if self.lap_running:
+            self.lbl_lap_status.setText("Timing from video playback.")
         interval = max(10, int(1000.0 / (self.video_fps * self.playback_speed)))
         self.video_timer.start(interval)
 
@@ -728,6 +802,8 @@ class VideoLoggerTab(QWidget):
         self.is_playing = False
         self.btn_play_pause.setText("▶ Play (Space)")
         self.video_timer.stop()
+        if self.lap_running and self.cap and self.cap.isOpened():
+            self.lbl_lap_status.setText("Activity timing paused — play the video to continue.")
 
     def _on_speed_changed(self):
         speed_text = self.combo_speed.currentText().replace("x", "")
@@ -805,32 +881,66 @@ class VideoLoggerTab(QWidget):
         if self.lap_running:
             lap_dur = max(0.0, curr_sec - self.lap_start_time_sec)
             self.lbl_lap_time.setText(format_seconds(lap_dur))
+        elif not self.cap:
+            self.lbl_time_display.setText(f"{format_seconds(curr_sec)} / Live")
 
     # =========================================================================
     # DUAL STOPWATCH TIMING LOGIC
     # =========================================================================
 
     def _toggle_master_timer(self):
-        """Start or Stop Master SMED Stopwatch in live manual timer mode."""
-        if not self.master_running:
-            self.master_running = True
+        """Start or pause the overall manual elapsed-time stopwatch."""
+        self._set_master_timer_running(not self.master_running)
+        if self.lap_running and not self.cap:
+            state = "running" if self.master_running else "paused"
+            self.lbl_lap_status.setText(f"Manual activity timing {state} with the master timer.")
+
+    def _set_master_timer_running(self, running: bool):
+        self.master_running = running
+        if running:
+            self._last_live_tick_time = time.monotonic()
             self.btn_master_toggle.setText("Stop Master")
             self.btn_master_toggle.setObjectName("dangerBtn")
-            self.btn_master_toggle.setStyleSheet("background-color: #EF4444; color: white;")
-            self.live_timer.start(50)  # update every 50ms
+            if not self.live_timer.isActive():
+                self.live_timer.start(50)
         else:
-            self.master_running = False
-            self.btn_master_toggle.setText("Resume Master")
-            self.btn_master_toggle.setObjectName("")
-            self.btn_master_toggle.setStyleSheet("")
-            if not self.lap_running:
-                self.live_timer.stop()
+            self._last_live_tick_time = None
+            self.btn_master_toggle.setText("Resume Master" if self.master_accumulated_sec else "Start Master")
+            self.btn_master_toggle.setObjectName("primaryBtn")
+            self.live_timer.stop()
+        self.btn_master_toggle.setStyleSheet("")
+        self.btn_master_toggle.style().unpolish(self.btn_master_toggle)
+        self.btn_master_toggle.style().polish(self.btn_master_toggle)
+
+    def _reset_timers_for_trial(self):
+        self.live_timer.stop()
+        self.master_running = False
+        self._last_live_tick_time = None
+        self.lap_running = False
+        self.btn_master_toggle.setText("Start Master")
+        self.btn_master_toggle.setObjectName("primaryBtn")
+        self.btn_master_toggle.setStyleSheet("")
+        self.btn_master_toggle.style().unpolish(self.btn_master_toggle)
+        self.btn_master_toggle.style().polish(self.btn_master_toggle)
+        self.lbl_lap_time.setText("00:00.00")
+        self.lbl_lap_status.setText("Status: Idle (Press 'S' to Start)")
+        self.btn_lap.setText(" Start / Lap Activity (S)")
+        self.btn_lap.setObjectName("primaryBtn")
+        self.btn_lap.setStyleSheet("")
+        self.btn_cancel_lap.setEnabled(False)
 
     def _on_live_tick(self):
-        """Tick event for live manual timer mode when no video is loaded."""
+        """Update manual stopwatch values using monotonic elapsed time."""
+        now = time.monotonic()
+        elapsed = now - self._last_live_tick_time if self._last_live_tick_time is not None else 0.0
+        self._last_live_tick_time = now
+
         if self.master_running:
-            self.master_accumulated_sec += 0.05
+            self.master_accumulated_sec += elapsed
             self.lbl_master_time.setText(format_seconds(self.master_accumulated_sec))
+
+        if not self.cap:
+            self.lbl_time_display.setText(f"{format_seconds(self.master_accumulated_sec)} / Live")
 
         if self.lap_running:
             curr_sec = self.get_current_time_sec()
@@ -885,15 +995,25 @@ class VideoLoggerTab(QWidget):
 
         if not self.lap_running:
             # START FIRST LAP
+            if not self.cap and not self.master_running:
+                self._set_master_timer_running(True)
             self.lap_running = True
             self.lap_start_time_sec = curr_time
             self.btn_lap.setText(" Log & Next Lap [S]")
             self.btn_lap.setObjectName("successBtn")
-            self.btn_lap.setStyleSheet("background-color: #10B981; color: white; font-weight: 700;")
+            self.btn_lap.setStyleSheet("")
             self.btn_cancel_lap.setEnabled(True)
-            self.lbl_lap_status.setText(f"Timing started at {format_seconds(curr_time)}")
-            if not self.cap and not self.live_timer.isActive():
-                self.live_timer.start(50)
+            if self.cap:
+                status = (
+                    "Timing from video playback."
+                    if self.is_playing
+                    else "Lap started — play the video to advance timing."
+                )
+            elif curr_time == 0:
+                status = "Manual timer started with this activity."
+            else:
+                status = "Activity timing from manual clock."
+            self.lbl_lap_status.setText(f"{status} Start: {format_seconds(curr_time)}")
         else:
             # FINISH CURRENT LAP AND LOG TO DB
             act_name = self.combo_activity.currentText().strip()
@@ -930,7 +1050,15 @@ class VideoLoggerTab(QWidget):
             # Reset for Next Lap (Zero-gap continuous logging)
             self.lap_start_time_sec = end_time
             self.input_remarks.clear()
-            self.lbl_lap_status.setText(f"Logged! Next lap started at {format_seconds(end_time)}")
+            if self.cap:
+                status = (
+                    "Logged. Next lap is timing from video playback."
+                    if self.is_playing
+                    else "Logged. Play the video to advance the next lap."
+                )
+            else:
+                status = "Logged. Next manual lap is running."
+            self.lbl_lap_status.setText(f"{status} Start: {format_seconds(end_time)}")
 
             # Reload activity table
             self._load_activity_logs()
@@ -944,7 +1072,9 @@ class VideoLoggerTab(QWidget):
         self.btn_lap.setStyleSheet("")
         self.btn_cancel_lap.setEnabled(False)
         self.lbl_lap_time.setText("00:00.00")
-        self.lbl_lap_status.setText("Status: Lap Cancelled")
+        self.lbl_lap_status.setText(
+            "Lap cancelled; master timer continues." if self.master_running else "Status: Lap Cancelled"
+        )
 
     # =========================================================================
     # ACTIVITY LOGS TABLE & SUBTOTAL CALCULATOR
@@ -976,7 +1106,7 @@ class VideoLoggerTab(QWidget):
             self.table_logs.setItem(row_idx, 1, name_item)
 
             # Type Badge
-            type_label = QLabel(f" {item['activity_type']} ")
+            type_label = QLabel(item["activity_type"])
             type_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             if item["activity_type"] == "Internal":
                 type_label.setStyleSheet(get_internal_badge_style())
@@ -997,7 +1127,7 @@ class VideoLoggerTab(QWidget):
 
             dur_item = QTableWidgetItem(format_seconds(item["duration_sec"]))
             dur_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            dur_item.setForeground(QColor("#38BDF8"))
+            dur_item.setForeground(QColor(COLORS["primary_blue"]))
             dur_font = dur_item.font()
             dur_font.setBold(True)
             dur_item.setFont(dur_font)

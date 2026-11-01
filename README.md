@@ -49,8 +49,9 @@ graph TD
 
 ### Stage 2: Tab 2 — Multi-Video Dual-Stopwatch Observation
 - **Offline Multi-Format Video Player:** Scrub, slow down (0.5x), and inspect shop-floor recordings (`.mp4`, `.avi`, `.mov`, `.mkv`).
-- **Master SMED Stopwatch:** Tracks total elapsed changeover time from Last Good Part to 6th OK Part.
-- **Activity Lap Stopwatch:** Continuous zero-gap micro-activity timing. Pressing `S` automatically logs the finished activity's end time and immediately starts the next activity without losing a single millisecond.
+- Import real shop-floor footage for an actual time study. **Demo SMED Videos** creates accelerated synthetic animations (30 seconds by default); they illustrate the workflow but are not real recordings, and their clip time is not the represented changeover duration.
+- **Master SMED Stopwatch:** Tracks total elapsed changeover time from Last Good Part to 6th OK Part. Start it manually, or let the first activity lap start it when no video is loaded.
+- **Activity Lap Stopwatch:** Continuous zero-gap micro-activity timing. With a video loaded, laps follow playback and pause when the video pauses; without a video, they follow the manual master timer. Pressing `S` logs the finished activity and immediately starts the next lap.
 - **Instantaneous Bifurcation:**
   - **INTERNAL [I]**: Machine is stopped (costly downtime).
   - **EXTERNAL [E]**: Machine is running production (zero downtime impact).
